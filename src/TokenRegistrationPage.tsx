@@ -6,7 +6,7 @@ import { registerAccount, registerToken } from './TokenService';
 
 //payment type
 const paymentTypes = [
-  { type: '', name: 'Mobile Number' },
+  { type: 'MSISDN', name: 'Mobile Number' },
   { type: 'ACCOUNT_NO', name: 'Account Number' },
   { type: 'EMAIL', name: 'Email' },
   { type: 'PERSONAL_ID', name: 'Personal ID' },
@@ -72,7 +72,7 @@ const TokenRegistrationPage: React.FC = () => {
     name: string;
   }
   
-  
+  //kyc data
   interface KYCData {
     name: string;
     dob: string;
@@ -98,6 +98,36 @@ const TokenRegistrationPage: React.FC = () => {
     kycInformation: string;
   }
   
+  //mojaloop kyc
+  interface PartyData {
+    party: {
+      body: {
+        partyIdInfo: {
+          partyIdType: string;
+          partyIdentifier: string;
+          fspId: string;
+        };
+        supportedCurrencies: string[];
+        personalInfo: {
+          complexName: {
+            firstName: string;
+            lastName: string;
+          };
+          dateOfBirth: string;
+          kycInformation: string;
+        };
+        name: string;
+        merchantClassificationCode: string;
+      };
+      headers: {
+        [key: string]: string;
+      };
+    };
+    currentState: string;
+  }
+  
+
+  //kyc info from esignet
   class KYCInformation {
     accessToken: string;
     idToken: string;
@@ -106,6 +136,8 @@ const TokenRegistrationPage: React.FC = () => {
     scope: string;
     sub: string;
     name: string;
+    firstname: string;
+    lastname: string;
     email: string;
     phoneNumber: string;
     dateOfBirth: string;
@@ -133,6 +165,8 @@ const TokenRegistrationPage: React.FC = () => {
       this.scope = data.scope;
       this.sub = data.user_info.sub;
       this.name = data.user_info.name;
+      this.firstname = data.user_info.firstname;
+      this.lastname = data.user_info.lastname;
       this.email = data.user_info.email;
       this.phoneNumber = data.user_info.phone_number;
       this.dateOfBirth = data.user_info.date_of_birth;
@@ -163,10 +197,12 @@ const TokenRegistrationPage: React.FC = () => {
     "scope": "openid profile email",
     "user_info": {
       "sub": "1234567890",
-      "name": "John Doe",
+      "name": "Yaro",
+      "firstname": "Yaro",
+      "lastname": "Smith",
       "email": "johndoe@example.com",
       "phone_number": "+1 555-123-4567",
-      "date_of_birth": "1980-05-15",
+      "date_of_birth": "1966-06-16",
       "passportNumber": "AB1234567",
       "address": "123 Main Street, Anytown, USA",
     //   "address": {
@@ -189,47 +225,53 @@ const TokenRegistrationPage: React.FC = () => {
  
   
    // Comparison logic goes here
-   const compareKYCData = useCallback(async(kycInfo: KYCInformation, kycData: KYCData, selectedPaymentType: string, payeeId: string) => {
+   const compareKYCData = useCallback(async(kycInfo: KYCInformation, kycData: PartyData, selectedPaymentType: string, payeeId: string) => {
     // Initialize a variable to store whether KYC data matches
     let match = true;
   
     // Compare relevant fields
-    if (kycInfo.name !== kycData.name) {
+    if (kycInfo.firstname !== kycData.party.body.personalInfo.complexName.firstName) {
       match = false;
-      console.log('Name does not match');
+      console.log('First name does not match');
     }
-    if (kycInfo.dateOfBirth !== kycData.dob) {
+
+    if (kycInfo.lastname !== kycData.party.body.personalInfo.complexName.lastName) {
+      match = false;
+      console.log('last name does not match');
+    }
+
+    if (kycInfo.dateOfBirth !== kycData.party.body.personalInfo.dateOfBirth) {
       match = false;
       console.log('Date of Birth does not match');
     }
-    if (kycInfo.email !== kycData.email) {
+    if (kycInfo.name !== kycData.party.body.name) {
       match = false;
-      console.log('Email does not match');
+      console.log('name does not match');
     }
-    if (kycInfo.phoneNumber !== kycData.phone) {
-      match = false;
-      console.log('Phone Number does not match');
-    }
-    if (
-      kycInfo.address !== kycData.address 
-    //   kycInfo.address.streetAddress !== kycData.address ||
-    //   kycInfo.address.city !== kycData.address ||
-    //   kycInfo.address.state !== kycData.address ||
-    //   kycInfo.address.postalCode !== kycData.address ||
-    //   kycInfo.address.country !== kycData.address
-    ) {
-      match = false;
-      console.log('Address does not match');
-    }
-    if (
-      kycInfo.passportNumber !== kycData.passport_number
-    //   kycInfo.kycData.idType !== 'passport' ||
-    //   kycInfo.kycData.idNumber !== kycData.passport_number ||
-    //   kycInfo.kycData.idExpiration !== kycData.expiry_date
-    ) {
-      match = false;
-      console.log('KYC Data does not match');
-    }
+    // if (kycInfo.phoneNumber !== kycData.phone) {
+    //   match = false;
+    //   console.log('Phone Number does not match');
+    // }
+    // if (
+    //   kycInfo.address !== kycData.address 
+    // //   kycInfo.address.streetAddress !== kycData.address ||
+    // //   kycInfo.address.city !== kycData.address ||
+    // //   kycInfo.address.state !== kycData.address ||
+    // //   kycInfo.address.postalCode !== kycData.address ||
+    // //   kycInfo.address.country !== kycData.address
+    // ) {
+    //   match = false;
+    //   console.log('Address does not match');
+    // }
+    // if (
+    //   kycInfo.passportNumber !== kycData.passport_number
+    // //   kycInfo.kycData.idType !== 'passport' ||
+    // //   kycInfo.kycData.idNumber !== kycData.passport_number ||
+    // //   kycInfo.kycData.idExpiration !== kycData.expiry_date
+    // ) {
+    //   match = false;
+    //   console.log('KYC Data does not match');
+    // }
   
     // Log the result of comparison
     if (match) {
@@ -271,14 +313,16 @@ const TokenRegistrationPage: React.FC = () => {
   //get partines
 const handleGetParties = async () => {
   try {
-      const apiUrl = `http://192.168.1.55:3001/parties/${selectedPaymentType}/${payeeId}}`;
+      const apiUrl = `https://test-mosippayee.devpm4ml.labspm4ml1002.mojaloop.live/mlcon-outbound/parties/${selectedPaymentType}/${payeeId}`;
       const response = await fetch(apiUrl);
       if (!response.ok) {
         throw new Error('Failed to fetch data');
       }
-      const { kycInformation }: ResponseData = await response.json();
-      const kycData: KYCData = JSON.parse(kycInformation).data;
-      console.log('Serialized KYC data:', kycData);
+      const kycInformation  = await response.json();
+      console.log('response moja KYC data:', kycInformation);
+
+      const kycData: PartyData = kycInformation;
+      console.log('Serialized moja KYC data:', kycData);
 
       // Compare KYC data after fetching
       compareKYCData(kycInfo, kycData, selectedPaymentType, payeeId);

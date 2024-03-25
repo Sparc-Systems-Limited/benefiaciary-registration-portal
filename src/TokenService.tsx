@@ -1,5 +1,5 @@
 
-const mojaloopUrl = "http://192.168.1.55:3000"
+const mojaloopUrl = "https://pta-portal-mosippayee.devpm4ml.labspm4ml1002.mojaloop.live"
 //get user info from esignet
 
 export const GetUserInfo = async (code: string, clientId: string, grant_type: string, redirect_uri: string): Promise<string | null> => {
@@ -71,7 +71,7 @@ export const registerToken = async (idType: string, payeeId: string, idToken: st
 
 
 export const registerAccount = async (idType: string, payeeId: string): Promise<string | null> => {
-  const apiUrl = `${mojaloopUrl}:3000/accounts`;
+  const apiUrl = `${mojaloopUrl}/mlcon-outbound/accounts`;
   const requestBody = {
     idType: idType,
     idValue: payeeId,
