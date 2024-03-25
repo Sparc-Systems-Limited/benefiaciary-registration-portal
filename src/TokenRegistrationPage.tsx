@@ -347,7 +347,7 @@ const handleGetParties = async () => {
     const generatedToken = 'token'; // Replace 'token' with the actual generated token
 
     // Construct the URL
-    const redirectUrl = `http://localhost:3006/registered-beneficiaries?userIdType=${userIdType}&token=${generatedToken}`;
+    const redirectUrl = `http://bms.sparcsystems.africa/registered-beneficiaries?userIdType=${userIdType}&token=${generatedToken}`;
     
 
     // Send a GET request to the constructed URL
