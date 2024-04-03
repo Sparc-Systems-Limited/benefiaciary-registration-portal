@@ -1,5 +1,5 @@
 
-const mojaloopUrl = "http://192.168.1.55:3000"
+const mojaloopUrl = "http://localhost"
 //get user info from esignet
 
 export const GetUserInfo = async (code: string, clientId: string, grant_type: string, redirect_uri: string): Promise<string | null> => {
@@ -40,7 +40,7 @@ export const registerToken = async (idType: string, payeeId: string, idToken: st
 
   console.log('Generated token:', token);
 
-  const apiUrl = `${mojaloopUrl}/tokens`;
+  const apiUrl = `https://pta-portal-mosippayee.devpm4ml.labspm4ml1002.mojaloop.live/tokens`;
   const requestBody = {
     payeeId: payeeId,
     payeeIdType: idType,
@@ -71,13 +71,14 @@ export const registerToken = async (idType: string, payeeId: string, idToken: st
 
 
 export const registerAccount = async (idType: string, payeeId: string): Promise<string | null> => {
-  const apiUrl = `${mojaloopUrl}:3000/accounts`;
-  const requestBody = {
-    idType: idType,
-    idValue: payeeId,
-    idSubValue: 'string',
-    currency: 'AED'
-  };
+  const apiUrl = `https://test-mosippayee.devpm4ml.labspm4ml1002.mojaloop.live/mlcon-outbound/accounts`;
+  const requestBody = [
+    {
+      idType: "ALIAS",
+      idValue: payeeId,
+      currency: "ZMW"
+    }
+  ];
 
   try {
     const response = await fetch(apiUrl, {
@@ -88,6 +89,8 @@ export const registerAccount = async (idType: string, payeeId: string): Promise<
       },
       body: JSON.stringify(requestBody)
     });
+
+    // No need for .json() here as it's a non-CORS request
     const responseData = await response.json();
 
     // Handle the response here
@@ -98,11 +101,21 @@ export const registerAccount = async (idType: string, payeeId: string): Promise<
 
     // Return the generated token
     return modelId;
+
+    if (response.ok) {
+      // If response is successful, return a success message or relevant data
+      return 'Account registered successfully.';
+    } else {
+      // If response is not successful, handle the error
+      console.error('Error registering account. Status:', response.status);
+      return null;
+    }
   } catch (error) {
     console.error('Error registering account:', error);
     return null;
   }
 };
+
 
 
 const generateRandomToken = async (idToken: string) => {
@@ -113,5 +126,7 @@ const generateRandomToken = async (idToken: string) => {
     for (let i = 0; i < length; i++) {
       result += characters.charAt(Math.floor(Math.random() * characters.length));
     }
-    return result;
+    //temporary
+    const tkn = 'CM101343JW9EWE24';
+    return tkn;
 };

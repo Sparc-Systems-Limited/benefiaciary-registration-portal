@@ -6,7 +6,7 @@ import { registerAccount, registerToken } from './TokenService';
 
 //payment type
 const paymentTypes = [
-  { type: '', name: 'Mobile Number' },
+  { type: 'MSISDN', name: 'Mobile Number' },
   { type: 'ACCOUNT_NO', name: 'Account Number' },
   { type: 'EMAIL', name: 'Email' },
   { type: 'PERSONAL_ID', name: 'Personal ID' },
@@ -271,7 +271,7 @@ const TokenRegistrationPage: React.FC = () => {
   //get partines
 const handleGetParties = async () => {
   try {
-      const apiUrl = `http://192.168.1.55:3001/parties/${selectedPaymentType}/${payeeId}}`;
+      const apiUrl = `http://localhost:3001/parties/${selectedPaymentType}/${payeeId}}`;
       const response = await fetch(apiUrl);
       if (!response.ok) {
         throw new Error('Failed to fetch data');
