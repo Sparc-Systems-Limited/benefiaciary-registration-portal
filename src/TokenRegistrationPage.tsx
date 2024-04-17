@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+//import redis from 'redis';
 
 import Header from './Header';
-import { registerAccount, registerToken } from './TokenService';
+import { fetchUserData, getUserToken, registerAccount, registerToken } from './TokenService';
+import { decodeJWTToken, generateJWTToken, generateJoseJWTToken, signJWTToken } from './JWTService';
+//import {  saveKYCInfoToRedis } from './SaveToRedis';
 
 //payment type
 const paymentTypes = [
@@ -18,6 +21,7 @@ const paymentTypes = [
 ];
 
 
+const mojaloopUrl = "https://pta-portal-mosippayee.devpm4ml.labspm4ml1002.mojaloop.live"
 
 
 const TokenRegistrationPage: React.FC = () => {
@@ -28,50 +32,8 @@ const TokenRegistrationPage: React.FC = () => {
   const [isGenerated, setIsGenerated] = useState<boolean | null>(null);
   const [accountPosted, setAccountPosted] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState<boolean | null>(null);
-  const [idToken, setIdToken] = useState<string>('');
   const [isMatch, setIsMatch] = useState<boolean | null>(null);
 
-
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const idTokenParam = urlParams.get('id_token');
-    if (idTokenParam) {
-      setIdToken(idTokenParam);
-    }
-
-/*
-  //get parties
- const handleGetParties = async () => {
-  try {
-      const apiUrl = `http://192.168.1.55:3001/parties/MSISDN/tE0F0cbxGJ`;
-      const response = await fetch(apiUrl);
-      if (!response.ok) {
-        throw new Error('Failed to fetch data');
-      }
-      const { kycInformation }: ResponseData = await response.json();
-      const kycData: KYCData = JSON.parse(kycInformation).data;
-      console.log('Serialized KYC data:', kycData);
-
-      // Compare KYC data after fetching
-      compareKYCData(kycInfo, kycData);
-    } catch (error) {
-      console.error('An error occurred while fetching party details:', error);
-      alert('Failed to fetch party details. Please try again later.');
-    }
-  };
-
-  // Call the function to fetch KYC information when the component mounts
-  handleGetParties();
-*/
-  }, []);
-
-  const navigate = useNavigate();
-  
-  interface PaymentType {
-    type: string;
-    name: string;
-  }
-  
   
   interface KYCData {
     name: string;
@@ -99,60 +61,123 @@ const TokenRegistrationPage: React.FC = () => {
   }
   
   class KYCInformation {
-    accessToken: string;
-    idToken: string;
-    tokenType: string;
-    expiresIn: number;
-    scope: string;
     sub: string;
-    name: string;
-    email: string;
-    phoneNumber: string;
-    dateOfBirth: string;
-    address: string;
-    // address: {
-    //   streetAddress: string;
-    //   city: string;
-    //   state: string;
-    //   postalCode: string;
-    //   country: string;
-    // };
-    kycStatus: string;
-    passportNumber: string;
-    kycData: {
-      idType: string;
-      idNumber: string;
-      idExpiration: string;
+    birthdate: string;
+    address: {
+      locality: string;
     };
+    gender: string;
+    name: string;
+    phone_number: string;
+    email: string;
+    picture: string;
   
     constructor(data: any) {
-      this.accessToken = data.access_token;
-      this.idToken = data.id_token;
-      this.tokenType = data.token_type;
-      this.expiresIn = data.expires_in;
-      this.scope = data.scope;
-      this.sub = data.user_info.sub;
-      this.name = data.user_info.name;
-      this.email = data.user_info.email;
-      this.phoneNumber = data.user_info.phone_number;
-      this.dateOfBirth = data.user_info.date_of_birth;
-      this.address = data.user_info.address;
-      this.passportNumber = data.user_info.passportNumber;
-    //     this.address = {
-    //     streetAddress: data.user_info.address.street_address,
-    //     city: data.user_info.address.city,
-    //     state: data.user_info.address.state,
-    //     postalCode: data.user_info.address.postal_code,
-    //     country: data.user_info.address.country
-    //   };
-      this.kycStatus = data.user_info.kyc_status;
-      this.kycData = {
-        idType: data.user_info.kyc_data.id_type,
-        idNumber: data.user_info.kyc_data.id_number,
-        idExpiration: data.user_info.kyc_data.id_expiration
-      };
-    }
+       this.sub = data.sub || '';
+       this.birthdate = data.birthdate || '';
+       this.address = data.address ? { locality: data.address.locality || '' } : { locality: '' };
+       this.gender = data.gender || '';
+       this.name = data.name || '';
+       this.phone_number = data.phone_number || '';
+      this.email = data.email || '';
+       this.picture = data.picture || '';
+     } 
   }
+
+  
+
+  const [userData, setUserData] = useState<KYCInformation | null>(null);
+
+  useEffect(() => {
+    /**
+     * Fetches data from the authorization server after the redirect
+     * 
+     * This function gets the code, state, and nonce from the query
+     * parameters of the URL and uses them to generate a JWT token,
+     * which is then used to get an access token from the authorization
+     * server, which is then used to fetch the user's data.
+     */
+    const fetchData = async () => {
+      // Get the current URL
+      const currentUrl = window.location.href;
+
+      // Get individual parameters from the URL
+      const searchParams = new URLSearchParams(window.location.search);
+      const nonce = searchParams.get('nonce');
+      const state = searchParams.get('state');
+      const code = searchParams.get('code');
+
+      // Check if code is not null before proceeding
+      if (code !== null && nonce !== null && state !== null) {
+        // Set up client ID, redirect URL, and user code for request
+        const clientId = 'XaOVhjFTX_H8UiZf-O1TuV4ChixshdO8RqghtA_cRUM';
+        const redirectUrl = encodeURIComponent('http://localhost:3007/');
+        const userCode = code;
+
+        // Set audience and token endpoint for request
+        const audience = 'https://esignet.collab.mosip.net/v1/esignet/oauth/token';
+        const tokenEndpoint = 'https://esignet.collab.mosip.net/v1/esignet/oauth/v2/token';
+
+        try {
+          // Generate JWT token
+          const jwtToken = await signJWTToken(clientId, audience);
+
+          // If successful, get access token
+          const token = await getUserToken(code, clientId, jwtToken, redirectUrl);
+
+          // If successful, fetch user data
+          const userToken = await fetchUserData(token);
+
+          // If successful, decode token which contains user information
+          const userTokenData = await decodeJWTToken(userToken);
+
+          // Create object with user data
+          const userData: KYCInformation = new KYCInformation(userTokenData);
+          
+          setUserData(userData);
+
+          // Save KYC information to Redis
+         // await saveKYCInfoToRedis(userData);
+
+          console.log('User data:', userData);
+
+        } catch (error) {
+          console.error('Error generating JWT token:', error);
+        }
+      } else {
+        console.error('Code is null'); // Handle the case where code is null
+      }
+    };
+  
+    fetchData(); // Call the async function immediately
+  
+    // No cleanup needed, so return undefined
+    return;
+  }, []); // Dependency array is empty since there are no dependencies for this effect
+
+
+  const navigate = useNavigate();
+  
+  
+  
+  
+  // Example usage:
+  const jsonData = {
+    "sub": "346717934331904843944838278198338358",
+    "birthdate": "1982/02/13",
+    "address": {
+      "locality": "Kenitra"
+    },
+    "gender": "Male",
+    "name": "ohn Doe",
+    "phone_number": "7550166813",
+    "email": "johndoe@example.com",
+    "picture": ""
+  };
+  
+ // const kycInfo = new KYCInformation(jsonData);
+  
+  //console.log(kycInfo);
   
   // Assuming response contains the API response
   const responseData = {
@@ -169,13 +194,6 @@ const TokenRegistrationPage: React.FC = () => {
       "date_of_birth": "1980-05-15",
       "passportNumber": "AB1234567",
       "address": "123 Main Street, Anytown, USA",
-    //   "address": {
-    //     "street_address": "123 Main Street, Anytown, USA",
-    //     "city": "Anytown",
-    //     "state": "CA",
-    //     "postal_code": "12345",
-    //     "country": "USA"
-    //   },
       "kyc_status": "verified",
       "kyc_data": {
         "id_type": "passport",
@@ -185,7 +203,7 @@ const TokenRegistrationPage: React.FC = () => {
     }
   };
   
-  const kycInfo = new KYCInformation(responseData);
+  //const kycInfo = new KYCInformation(responseData);
  
   
    // Comparison logic goes here
@@ -198,7 +216,7 @@ const TokenRegistrationPage: React.FC = () => {
       match = false;
       console.log('Name does not match');
     }
-    if (kycInfo.dateOfBirth !== kycData.dob) {
+    if (kycInfo.birthdate !== kycData.dob) {
       match = false;
       console.log('Date of Birth does not match');
     }
@@ -206,26 +224,18 @@ const TokenRegistrationPage: React.FC = () => {
       match = false;
       console.log('Email does not match');
     }
-    if (kycInfo.phoneNumber !== kycData.phone) {
+    if (kycInfo.phone_number !== kycData.phone) {
       match = false;
       console.log('Phone Number does not match');
     }
     if (
-      kycInfo.address !== kycData.address 
-    //   kycInfo.address.streetAddress !== kycData.address ||
-    //   kycInfo.address.city !== kycData.address ||
-    //   kycInfo.address.state !== kycData.address ||
-    //   kycInfo.address.postalCode !== kycData.address ||
-    //   kycInfo.address.country !== kycData.address
+      kycInfo.address.locality !== kycData.address 
     ) {
       match = false;
       console.log('Address does not match');
     }
     if (
-      kycInfo.passportNumber !== kycData.passport_number
-    //   kycInfo.kycData.idType !== 'passport' ||
-    //   kycInfo.kycData.idNumber !== kycData.passport_number ||
-    //   kycInfo.kycData.idExpiration !== kycData.expiry_date
+      kycInfo.gender !== kycData.gender
     ) {
       match = false;
       console.log('KYC Data does not match');
@@ -239,25 +249,40 @@ const TokenRegistrationPage: React.FC = () => {
 
       
       //register token
-    const token = await registerToken(selectedPaymentType, payeeId, kycInfo.accessToken);
+    const token = await registerToken(selectedPaymentType, payeeId, kycInfo.sub);
+
     setLoading(false);
+
     setIsLoading(false);
+
     if (token) {
+
       setIsRegistered(true);
+
       setIsGenerated(true);
+
     } else {
+
       setIsRegistered(false);
+
       setIsGenerated(false);
       
     }
 
     const account = await registerAccount(selectedPaymentType, payeeId);
+
     setLoading(false);
+
     setIsLoading(false);
+
     if (token) {
+
       setAccountPosted(true);
+
     } else {
+
       setAccountPosted(false);
+
     }
 
 
@@ -268,54 +293,98 @@ const TokenRegistrationPage: React.FC = () => {
     }
   }, []);
   
-  //get partines
-const handleGetParties = async () => {
-  try {
-      const apiUrl = `http://localhost:3001/parties/${selectedPaymentType}/${payeeId}}`;
+  /**
+   * Fetches KYC information from the switch based on the selected
+   * payment type and payee ID.
+   */
+  const handleGetParties = async () => {
+    try {
+      const apiUrl = `http://localhost:3001/parties/${selectedPaymentType}/${payeeId}`;
       const response = await fetch(apiUrl);
       if (!response.ok) {
         throw new Error('Failed to fetch data');
       }
+
       const { kycInformation }: ResponseData = await response.json();
       const kycData: KYCData = JSON.parse(kycInformation).data;
+
+      // Log the serialized KYC data received from the switch
       console.log('Serialized KYC data:', kycData);
+      
+      // get data from redis
+      if (!userData) {
+        console.log('User Data is nulll');
+        return;
+      }
+
+      //const kycInfo = getKYCInfoFromRedis(userData.sub);
+
 
       // Compare KYC data after fetching
-      compareKYCData(kycInfo, kycData, selectedPaymentType, payeeId);
+      compareKYCData(userData, kycData, selectedPaymentType, payeeId);
     } catch (error) {
+      // Log an error if an exception occurs while fetching KYC information
       console.error('An error occurred while fetching party details:', error);
     }
   };
 
-  //handle form submition
+
+  /**
+   * Handle form submission
+   * 
+   * Fetches KYC information from the switch, compares it with the
+   * KYC information provided by the user, and redirects the user
+   * to the registered beneficiaries page if the data matches.
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setIsLoading(true);
+
+    /**
+     * Fetch KYC information from the switch based on the selected
+     * payment type and payee ID
+     */
     await handleGetParties();
+
+    /**
+     * Set the loading state to false, indicating that the form
+     * is no longer submitting
+     */
     setLoading(false);
+
+    /**
+     * Set the isLoading state to false, indicating that the
+     * fetching of KYC information is complete
+     */
     setIsLoading(false);
   };
 
+
+  /**
+   * Handle redirection to the registered beneficiaries page
+   * 
+   * This function assumes that the userIdType and generatedToken are
+   * available. It constructs a URL, sends a GET request to the URL,
+   * and redirects the user to the registered beneficiaries page.
+   */
   const handleRedirect = async () => {
-    // Assuming userIdType and generatedToken are available
     const userIdType = selectedPaymentType;
     const generatedToken = 'token'; // Replace 'token' with the actual generated token
 
     // Construct the URL
     const redirectUrl = `http://localhost:3006/registered-beneficiaries?userIdType=${userIdType}&token=${generatedToken}`;
-    
 
     // Send a GET request to the constructed URL
     try {
-    
-        // Redirect to the specified URL
-        window.location.href = redirectUrl;
-     
+      // Redirect to the specified URL
+      window.location.href = redirectUrl;
+
     } catch (error) {
       console.error('Error redirecting:', error);
     }
   };
+
 
   return (
     <div>
@@ -325,7 +394,7 @@ const handleGetParties = async () => {
         <div className="w3-container w3-card-4">
           <h2>Token Registration</h2>
           <form className='w3-container w3-card w3-padding-16' onSubmit={handleSubmit}>
-            <h4>Welcome <b>{kycInfo.name}</b>, Please select the payment type and number</h4>
+            <h4>Welcome <b>{userData ?userData.name:''}</b>, Please select the payment type and number</h4>
             <div className='w3-padding-16'>
               <label htmlFor="paymentType">Payment Type:</label>
               <select className='w3-input w3-border w3-round w3-animate-input' style={{width:'30%'}} id="paymentType" value={selectedPaymentType} onChange={(e) => setSelectedPaymentType(e.target.value)}>

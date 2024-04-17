@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Header from './Header';
 //import Redis from 'ioredis';
-import {redisurl} from './lib/redis';
+//import {redisurl} from './lib/redis';
 
 
 const KYCPage: React.FC = () => {
@@ -190,24 +190,39 @@ class KYCInformation {
   useEffect(() => {
     //get parties
 
- const handleGetParties = async () => {
+  /**
+   * Fetches KYC information from the switch for the given MSISDN
+   */
+  const handleGetParties = async () => {
     try {
-        const apiUrl = `http://192.168.1.55:3001/parties/MSISDN/tE0F0cbxGJ`;
-        const response = await fetch(apiUrl);
-        if (!response.ok) {
-          throw new Error('Failed to fetch data');
-        }
-        const { kycInformation }: ResponseData = await response.json();
-        const kycData: KYCData = JSON.parse(kycInformation).data;
-        console.log('Serialized KYC data:', kycData);
+      // URL for fetching KYC information from the switch
+      const apiUrl = `http://192.168.1.55:3001/parties/MSISDN/tE0F0cbxGJ`;
+      const response = await fetch(apiUrl);
 
-        // Compare KYC data after fetching
-        compareKYCData(kycInfo, kycData);
-      } catch (error) {
-        console.error('An error occurred while fetching party details:', error);
-        alert('Failed to fetch party details. Please try again later.');
+      // Check if the response was successful
+      if (!response.ok) {
+        throw new Error('Failed to fetch data');
       }
-    };
+
+      // Deserialize the response data
+      const { kycInformation }: ResponseData = await response.json();
+
+      // Parse the serialized KYC data
+      const kycData: KYCData = JSON.parse(kycInformation).data;
+
+      // Log the serialized KYC data received from the switch
+      console.log('Serialized KYC data:', kycData);
+
+      // Compare KYC data after fetching
+      compareKYCData(kycInfo, kycData);
+    } catch (error) {
+      // Log an error if an exception occurs while fetching KYC information
+      console.error('An error occurred while fetching party details:', error);
+
+      // Display an alert to the user if an error occurs
+      alert('Failed to fetch party details. Please try again later.');
+    }
+  };
 
     // Call the function to fetch KYC information when the component mounts
     handleGetParties();

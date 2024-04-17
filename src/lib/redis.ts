@@ -1,6 +1,6 @@
-import {Redis} from "ioredis"
+//import {Redis} from "ioredis"
 
-const getRedisUrl = () => {
+export const getRedisUrl = () => {
     if (process.env.REDIS_URL) {
         return process.env.REDIS_URL
     }
@@ -8,4 +8,4 @@ const getRedisUrl = () => {
     throw new Error("REDIS_URL must be set")
 }
 
-export const redisurl = new Redis(getRedisUrl())
+//export const redisurl = new Redis(getRedisUrl())
