@@ -8,7 +8,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 
 # Install dependencies
-RUN npm install
+RUN npm ci
 
 # Copy the entire project to the working directory
 COPY . .
@@ -16,15 +16,17 @@ COPY . .
 # Build the React app
 RUN npm run build
 
-# Use nginx as the base image for serving the static files
-FROM nginx:alpine
+# Use Node.js as the base image for the runtime
+FROM node:lts-alpine
 
-# Copy the built React app from the previous stage to the nginx directory
-COPY --from=build /app/build /usr/share/nginx/html
+# Set the working directory
+WORKDIR /app
 
-# Expose port 80
-EXPOSE 80
+# Copy the built React app from the previous stage
+COPY --from=build /app/build .
 
-# Start nginx to serve the static files
-CMD ["nginx", "-g", "daemon off;"]
+# Expose the port your React app is running on
+EXPOSE 3007
 
+# Start the React app
+CMD ["npm", "start"]
